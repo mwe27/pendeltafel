@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pendeltafel</title>
-<meta name="theme-color" content="#f3f5f4">
+<meta name="theme-color" content="#000000">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="icon" href="icons/icon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -12,38 +12,26 @@
 <meta name="apple-mobile-web-app-title" content="Pendeltafel">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
 <style>
 /* Layout: zwei Orte als Bänder, darin je zwei Richtungen nebeneinander (mobil gestapelt); Zeiten als Abfahrtstafel-Zeilen */
+/* Farben aus dem Firefox-Theme „inductivemind_dunkel“: bewusst nur dunkel, reizarm,
+   keine Verläufe oder Muster, Fellrot als einziger Akzent (nur für Verspätung/Ausfall). */
 :root {
-  --bg: #f3f5f4;
-  --panel: #ffffff;
-  --ink: #17201d;
-  --muted: #5d6b66;
-  --line: #dde3e0;
-  --accent: #0b6e5f;
-  --accent-ink: #ffffff;
-  --late: #c2410c;
-  --ok: #15803d;
-  --cancel: #b91c1c;
-  --chip: #e8eeeb;
+  --bg: #000000;
+  --ink: #E4E9ED;      /* Text, 17:1 */
+  --muted: #9CA8B3;    /* gedämpft, 8,7:1 */
+  --line: #2E3D4B;     /* Linien */
+  --accent: #D98F69;   /* Fellrot hell, einziger Akzent, 8,1:1 */
+  --hover: #4A7088;    /* Petrol, Hover mit weißer Schrift 5,3:1 */
+  --hover-ink: #FFFFFF;
+  --active: #2C5076;   /* Marine */
+  --focus: #A9C9EC;    /* Link/Fokus */
   --f-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
   --f-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0f1513; --panel: #17201d; --ink: #e8efec; --muted: #94a39d; --line: #2a3531;
-    --accent: #3fbfa8; --accent-ink: #062520; --late: #fb923c; --ok: #4ade80; --cancel: #f87171; --chip: #223029;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #0f1513; --panel: #17201d; --ink: #e8efec; --muted: #94a39d; --line: #2a3531;
-  --accent: #3fbfa8; --accent-ink: #062520; --late: #fb923c; --ok: #4ade80; --cancel: #f87171; --chip: #223029;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -61,22 +49,23 @@ h1 { font: 700 1.9rem/1 var(--f-display); margin: 0; letter-spacing: .01em; text
 .stand { color: var(--muted); font-size: .9rem; font-variant-numeric: tabular-nums; }
 .btn {
   font: 600 .95rem var(--f-display); letter-spacing: .03em;
-  border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
   border-radius: 8px; padding: 7px 14px; cursor: pointer;
 }
-.btn:hover { border-color: var(--accent); }
-.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn:hover { background: var(--hover); border-color: var(--hover); color: var(--hover-ink); }
+.btn:active { background: var(--active); border-color: var(--active); color: var(--hover-ink); }
+.btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.btn:disabled { color: var(--muted); background: var(--bg); border-color: var(--line); cursor: default; }
 .head-actions { display: flex; align-items: center; gap: 12px; }
 
 section.city { display: flex; flex-direction: column; gap: 12px; }
 .city h2 { font: 700 .85rem var(--f-display); text-transform: uppercase; letter-spacing: .14em; color: var(--muted); margin: 0; }
 .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
 
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; min-width: 0; }
+.card { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; min-width: 0; }
 .card-head { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
 .route { font: 700 1.2rem/1.2 var(--f-display); margin: 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
-.route .arrow { color: var(--accent); }
+.route .arrow { color: var(--muted); }
 .sub { color: var(--muted); font-size: .82rem; margin-top: 2px; }
 
 ol.deps { list-style: none; margin: 0; padding: 0; }
@@ -88,12 +77,12 @@ ol.deps { list-style: none; margin: 0; padding: 0; }
 .time { font: 700 1.35rem/1 var(--f-display); font-variant-numeric: tabular-nums; }
 .time .sched { display: block; font: 500 .78rem var(--f-body); color: var(--muted); text-decoration: line-through; margin-top: 2px; }
 .delay { display: block; font: 600 .78rem var(--f-body); margin-top: 3px; font-variant-numeric: tabular-nums; }
-.delay.late { color: var(--late); }
-.delay.ontime { color: var(--ok); }
+.delay.late { color: var(--accent); }
+.delay.ontime { color: var(--muted); font-weight: 500; }
 .delay.plan { color: var(--muted); font-weight: 500; font-size: .7rem; }
 .badge {
   justify-self: start; font: 700 .9rem/1 var(--f-display); padding: 4px 7px; border-radius: 5px; min-width: 2.6rem; text-align: center;
-  background: var(--chip); color: var(--ink); white-space: nowrap;
+  background: var(--bg); color: var(--ink); border: 1px solid var(--line); white-space: nowrap;
 }
 .info { min-width: 0; }
 .dir { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -102,21 +91,20 @@ ol.deps { list-style: none; margin: 0; padding: 0; }
 .in { text-align: right; font: 600 1.05rem/1 var(--f-display); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .in small { display: block; font: 500 .72rem var(--f-body); color: var(--muted); margin-top: 3px; }
 .dep.cancelled .time, .dep.cancelled .dir { text-decoration: line-through; color: var(--muted); }
-.dep.cancelled .in { color: var(--cancel); font-size: .85rem; }
-.dep.later { background: color-mix(in srgb, var(--chip) 45%, transparent); }
+.dep.cancelled .in { color: var(--accent); font-size: .85rem; }
 
 .empty, .error, .loading { padding: 18px 16px; color: var(--muted); }
-.error { color: var(--cancel); }
-.loading .bar { height: 10px; border-radius: 4px; background: var(--chip); margin: 10px 0; animation: pulse 1.2s ease-in-out infinite; }
+.error { color: var(--accent); }
+/* Ladezustand ohne Animation (reizarm) */
+.loading .bar { height: 10px; border-radius: 4px; background: var(--line); margin: 10px 0; }
 .loading .bar:nth-child(2) { width: 80%; } .loading .bar:nth-child(3) { width: 60%; }
-@keyframes pulse { 50% { opacity: .45; } }
-@media (prefers-reduced-motion: reduce) { .loading .bar { animation: none; } }
 
 .card-foot { margin-top: auto; padding: 10px 16px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; border-top: 1px solid var(--line); }
 .card-foot .count { color: var(--muted); font-size: .82rem; }
 
 footer { color: var(--muted); font-size: .8rem; line-height: 1.5; max-width: 70ch; }
-footer a { color: var(--accent); }
+footer a { color: var(--focus); }
+footer a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 @media (max-width: 420px) {
   .dep { grid-template-columns: 3.7rem 2.9rem 1fr auto; gap: 4px 8px; padding: 10px 12px; }
@@ -283,7 +271,6 @@ function depRow(d, isLater) {
   if (d.fromWest) where.push("ab <b>Hbf West</b>");
   const arrTxt = `an ${fmtTime.format(d.arr)}${arrDelay > 0 && d.realtime ? ` (+${arrDelay})` : ""}${d.toWest ? " Hbf West" : ""}`;
   where.push(arrTxt);
-  const badgeStyle = d.color ? `style="background:#${esc(d.color)};color:#${esc(d.textColor || "ffffff")}"` : "";
   let inHtml;
   if (d.cancelled) inHtml = "fällt aus";
   else if (mins <= 0) inHtml = "jetzt";
@@ -291,7 +278,7 @@ function depRow(d, isLater) {
   else inHtml = `${Math.floor(mins / 60)} h ${String(mins % 60).padStart(2, "0")}<small>bis Abfahrt</small>`;
   return `<li class="dep${d.cancelled ? " cancelled" : ""}${isLater ? " later" : ""}">
     <div class="time">${fmtTime.format(d.dep)}${delay > 0 && !d.cancelled ? `<span class="sched">${fmtTime.format(d.depSched)}</span>` : ""}${delayHtml}</div>
-    <span class="badge" ${badgeStyle}>${esc(d.line)}</span>
+    <span class="badge">${esc(d.line)}</span>
     <div class="info"><div class="dir" title="${esc(d.headsign)}">${esc(d.headsign)}</div><div class="meta">${where.join(" · ")}</div></div>
     <div class="in">${inHtml}</div>
   </li>`;
@@ -351,7 +338,7 @@ function buildCards() {
       <div class="body" aria-live="polite"></div>
       <div class="card-foot" hidden>
         <span class="count"></span>
-        <button class="btn primary" type="button" id="more-${r.key}" aria-controls="card-${r.key}">mehr</button>
+        <button class="btn" type="button" id="more-${r.key}" aria-controls="card-${r.key}">mehr</button>
       </div>`;
     card.querySelector("button").addEventListener("click", () => {
       state[r.key].expanded = !state[r.key].expanded;
