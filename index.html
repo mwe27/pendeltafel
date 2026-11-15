@@ -30,6 +30,7 @@
   --hover-ink: #FFFFFF;
   --active: #2C5076;   /* Marine */
   --focus: #A9C9EC;    /* Link/Fokus */
+  --ok: #4ade80;       /* „pünktlich“ (ursprüngliches Grün), 13:1 */
   --f-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
   --f-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: dark;
@@ -78,7 +79,7 @@ ol.deps { list-style: none; margin: 0; padding: 0; }
 .time .sched { display: block; font: 500 .78rem var(--f-body); color: var(--muted); text-decoration: line-through; margin-top: 2px; }
 .delay { display: block; font: 600 .78rem var(--f-body); margin-top: 3px; font-variant-numeric: tabular-nums; }
 .delay.late { color: var(--accent); }
-.delay.ontime { color: var(--muted); font-weight: 500; }
+.delay.ontime { color: var(--ok); }
 .delay.plan { color: var(--muted); font-weight: 500; font-size: .7rem; }
 .badge {
   justify-self: start; font: 700 .9rem/1 var(--f-display); padding: 4px 7px; border-radius: 5px; min-width: 2.6rem; text-align: center;
@@ -251,6 +252,14 @@ async function loadRoute(r) {
   return [...byTrip.values()].sort((x, y) => x.dep - y.dep);
 }
 
+// Linienschild in der Farbe des Verkehrsverbunds (z. B. RB63 rot); ohne Angabe neutral
+function badgeStyle(d) {
+  const hex = /^[0-9a-f]{6}$/i;
+  if (!d.color || !hex.test(d.color)) return "";
+  const fg = d.textColor && hex.test(d.textColor) ? d.textColor : "ffffff";
+  return ` style="background:#${d.color};border-color:#${d.color};color:#${fg}"`;
+}
+
 function minutesUntil(d) { return Math.round((d - Date.now()) / 60000); }
 
 function depRow(d, isLater) {
@@ -278,7 +287,7 @@ function depRow(d, isLater) {
   else inHtml = `${Math.floor(mins / 60)} h ${String(mins % 60).padStart(2, "0")}<small>bis Abfahrt</small>`;
   return `<li class="dep${d.cancelled ? " cancelled" : ""}${isLater ? " later" : ""}">
     <div class="time">${fmtTime.format(d.dep)}${delay > 0 && !d.cancelled ? `<span class="sched">${fmtTime.format(d.depSched)}</span>` : ""}${delayHtml}</div>
-    <span class="badge">${esc(d.line)}</span>
+    <span class="badge"${badgeStyle(d)}>${esc(d.line)}</span>
     <div class="info"><div class="dir" title="${esc(d.headsign)}">${esc(d.headsign)}</div><div class="meta">${where.join(" · ")}</div></div>
     <div class="in">${inHtml}</div>
   </li>`;
