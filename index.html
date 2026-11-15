@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pendeltafel</title>
+<meta name="theme-color" content="#f3f5f4">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/icon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Pendeltafel">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: zwei Orte als Bänder, darin je zwei Richtungen nebeneinander (mobil gestapelt); Zeiten als Abfahrtstafel-Zeilen */
+:root {
+  --bg: #f3f5f4;
+  --panel: #ffffff;
+  --ink: #17201d;
+  --muted: #5d6b66;
+  --line: #dde3e0;
+  --accent: #0b6e5f;
+  --accent-ink: #ffffff;
+  --late: #c2410c;
+  --ok: #15803d;
+  --cancel: #b91c1c;
+  --chip: #e8eeeb;
+  --f-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1513; --panel: #17201d; --ink: #e8efec; --muted: #94a39d; --line: #2a3531;
+    --accent: #3fbfa8; --accent-ink: #062520; --late: #fb923c; --ok: #4ade80; --cancel: #f87171; --chip: #223029;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1513; --panel: #17201d; --ink: #e8efec; --muted: #94a39d; --line: #2a3531;
+  --accent: #3fbfa8; --accent-ink: #062520; --late: #fb923c; --ok: #4ade80; --cancel: #f87171; --chip: #223029;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.45 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 32px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font: 700 1.9rem/1 var(--f-display); margin: 0; letter-spacing: .01em; text-wrap: balance; }
+.stand { color: var(--muted); font-size: .9rem; font-variant-numeric: tabular-nums; }
+.btn {
+  font: 600 .95rem var(--f-display); letter-spacing: .03em;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  border-radius: 8px; padding: 7px 14px; cursor: pointer;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.head-actions { display: flex; align-items: center; gap: 12px; }
+
+section.city { display: flex; flex-direction: column; gap: 12px; }
+.city h2 { font: 700 .85rem var(--f-display); text-transform: uppercase; letter-spacing: .14em; color: var(--muted); margin: 0; }
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; min-width: 0; }
+.card-head { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
+.route { font: 700 1.2rem/1.2 var(--f-display); margin: 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.route .arrow { color: var(--accent); }
+.sub { color: var(--muted); font-size: .82rem; margin-top: 2px; }
+
+ol.deps { list-style: none; margin: 0; padding: 0; }
+.dep {
+  display: grid; grid-template-columns: 4.1rem 3.2rem 1fr auto; gap: 4px 10px; align-items: center;
+  padding: 10px 16px; border-bottom: 1px solid var(--line);
+}
+.dep:last-child { border-bottom: 0; }
+.time { font: 700 1.35rem/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.time .sched { display: block; font: 500 .78rem var(--f-body); color: var(--muted); text-decoration: line-through; margin-top: 2px; }
+.delay { display: block; font: 600 .78rem var(--f-body); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.delay.late { color: var(--late); }
+.delay.ontime { color: var(--ok); }
+.delay.plan { color: var(--muted); font-weight: 500; font-size: .7rem; }
+.badge {
+  justify-self: start; font: 700 .9rem/1 var(--f-display); padding: 4px 7px; border-radius: 5px; min-width: 2.6rem; text-align: center;
+  background: var(--chip); color: var(--ink); white-space: nowrap;
+}
+.info { min-width: 0; }
+.dir { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meta { color: var(--muted); font-size: .82rem; font-variant-numeric: tabular-nums; }
+.meta b { color: var(--ink); font-weight: 600; }
+.in { text-align: right; font: 600 1.05rem/1 var(--f-display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.in small { display: block; font: 500 .72rem var(--f-body); color: var(--muted); margin-top: 3px; }
+.dep.cancelled .time, .dep.cancelled .dir { text-decoration: line-through; color: var(--muted); }
+.dep.cancelled .in { color: var(--cancel); font-size: .85rem; }
+.dep.later { background: color-mix(in srgb, var(--chip) 45%, transparent); }
+
+.empty, .error, .loading { padding: 18px 16px; color: var(--muted); }
+.error { color: var(--cancel); }
+.loading .bar { height: 10px; border-radius: 4px; background: var(--chip); margin: 10px 0; animation: pulse 1.2s ease-in-out infinite; }
+.loading .bar:nth-child(2) { width: 80%; } .loading .bar:nth-child(3) { width: 60%; }
+@keyframes pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .loading .bar { animation: none; } }
+
+.card-foot { margin-top: auto; padding: 10px 16px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; border-top: 1px solid var(--line); }
+.card-foot .count { color: var(--muted); font-size: .82rem; }
+
+footer { color: var(--muted); font-size: .8rem; line-height: 1.5; max-width: 70ch; }
+footer a { color: var(--accent); }
+
+@media (max-width: 420px) {
+  .dep { grid-template-columns: 3.7rem 2.9rem 1fr auto; gap: 4px 8px; padding: 10px 12px; }
+  .time { font-size: 1.2rem; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Pendeltafel</h1>
+      <div class="stand" id="stand">Lade Abfahrten …</div>
+    </div>
+    <div class="head-actions">
+      <button class="btn" id="refresh" type="button">Aktualisieren</button>
+    </div>
+  </header>
+
+  <section class="city" aria-labelledby="h-tue">
+    <h2 id="h-tue">Tübingen · Bahn</h2>
+    <div class="pair" id="pair-tue"></div>
+  </section>
+
+  <section class="city" aria-labelledby="h-mz">
+    <h2 id="h-mz">Mainz · Straßenbahn & Bus</h2>
+    <div class="pair" id="pair-mz"></div>
+  </section>
+
+  <footer>
+    Nur Direktverbindungen ohne Umsteigen: in Tübingen Bahn, in Mainz Straßenbahn und Bus. Zeiten mit Echtzeit, soweit die Verkehrsunternehmen sie liefern.
+    Daten: <a href="https://transitous.org" target="_blank" rel="noopener">Transitous</a> (MOTIS) mit Fahrplandaten von DELFI.
+    Die Seite aktualisiert sich alle 2 Minuten, solange sie geöffnet ist.
+  </footer>
+</div>
+
+<script>
+const API = "https://api.transitous.org/api/v1/stoptimes";
+const REFRESH_MS = 120000;
+
+// Haltestellen (DELFI-IDs). Die Abfrage liefert automatisch alle Steige der Station mit
+// (Mainz Hbf schließt "Hbf West/Taubertsberg" ein).
+const STOPS = {
+  kfurt:  { id: "de-DELFI_de:08416:2002",  name: "Kirchentellinsfurt" },
+  tueHbf: { id: "de-DELFI_de:08416:11000", name: "Tübingen Hbf" },
+  mzHbf:  { id: "de-DELFI_de:07315:9037",  name: "Mainz Hbf" },
+  // Nur Steig A und B (die übrigen Steige der Haltestelle werden ausgefiltert)
+  mzUni:  { id: "de-DELFI_de:07315:32202:4:A", name: "Universität (Oberstadt)", note: "nur Steig A/B",
+            platforms: ["de-DELFI_de:07315:32202:4:A", "de-DELFI_de:07315:32202:4:B"] },
+};
+const platformOk = (stop, stopId) => !stop.platforms || stop.platforms.includes(stopId);
+const HBF_WEST = "de-DELFI_de:07315:32236";
+const isSecondary = id => matches(id, [HBF_WEST]) ? 1 : 0;
+
+const ROUTES = [
+  // short = sichtbares Zeitfenster, long = nach „mehr“ (Minuten)
+  { key: "kt", pair: "pair-tue", from: STOPS.kfurt,  to: STOPS.tueHbf, modes: "RAIL", label: "Regionalbahn", short: 60, long: 180 },
+  { key: "tk", pair: "pair-tue", from: STOPS.tueHbf, to: STOPS.kfurt,  modes: "RAIL", label: "Regionalbahn", short: 60, long: 180 },
+  { key: "um", pair: "pair-mz",  from: STOPS.mzUni,  to: STOPS.mzHbf,  modes: "TRAM,BUS", label: "Straßenbahn und Bus", short: 15, long: 60 },
+  { key: "mu", pair: "pair-mz",  from: STOPS.mzHbf,  to: STOPS.mzUni,  modes: "TRAM,BUS", label: "Straßenbahn und Bus", short: 15, long: 60 },
+];
+
+const spanShort = m => m > 60 && m % 60 === 0 ? `${m / 60} Std.` : `${m} min`;
+const spanLong = m => m % 60 === 0 ? (m === 60 ? "60 Minuten" : `${m / 60} Stunden`) : `${m} Minuten`;
+
+const state = {}; // key -> { deps, error, expanded, loading }
+
+const fmtTime = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
+const fmtFull = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Europe/Berlin" });
+
+const matches = (stopId, list) => !!stopId && list.some(p => stopId === p || stopId.startsWith(p + ":"));
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+const sleep = ms => new Promise(res => setTimeout(res, ms));
+
+// Der Server lehnt gleichzeitige Anfragen gelegentlich ab; dann kurz warten und erneut versuchen.
+async function fetchWithRetry(url, tries = 3) {
+  let lastErr;
+  for (let i = 0; i < tries; i++) {
+    if (i) await sleep(700 * i + Math.random() * 400);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Server antwortet mit ${res.status}`);
+      return await res.json();
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr;
+}
+
+// Abfahrten am Start und Ankünfte am Ziel laden und über die Fahrt-ID verknüpfen:
+// Jede Fahrt, die am Start abfährt und danach am Ziel ankommt, ist eine Direktverbindung.
+async function loadRoute(r) {
+  const start = Date.now() - 60000;
+  const depWin = r.long * 60;
+  const arrWin = (r.long + 60) * 60;           // Fahrzeit-Puffer für die Ankünfte
+  const depQ = new URLSearchParams({ stopId: r.from.id, time: new Date(start).toISOString(), window: String(depWin), n: "1", mode: r.modes });
+  // arriveBy=true sucht rückwärts ab "time", daher Endzeitpunkt angeben
+  const arrQ = new URLSearchParams({ stopId: r.to.id, time: new Date(start + arrWin * 1000).toISOString(), window: String(arrWin), n: "1", mode: r.modes, arriveBy: "true" });
+  const depData = await fetchWithRetry(`${API}?${depQ}`);
+  await sleep(150);
+  const arrData = await fetchWithRetry(`${API}?${arrQ}`);
+
+  const arrivals = new Map();                         // tripId -> [Ankunfts-Halte]
+  for (const st of arrData.stopTimes || []) {
+    if (!st.place?.arrival || st.place.dropoffType === "NOT_ALLOWED") continue;
+    if (!platformOk(r.to, st.place.stopId)) continue;
+    if (!arrivals.has(st.tripId)) arrivals.set(st.tripId, []);
+    arrivals.get(st.tripId).push(st);
+  }
+
+  const byTrip = new Map();
+  for (const st of depData.stopTimes || []) {
+    const p = st.place;
+    if (!p?.departure || p.pickupType === "NOT_ALLOWED") continue;
+    if (!platformOk(r.from, p.stopId)) continue;
+    const depT = new Date(p.departure);
+    const cands = (arrivals.get(st.tripId) || []).filter(a => new Date(a.place.arrival) > depT);
+    if (!cands.length) continue;
+    // Bevorzugt den Hauptbahnhof selbst, sonst die früheste Ankunft
+    cands.sort((a, b) => (isSecondary(a.place.stopId) - isSecondary(b.place.stopId)) || (new Date(a.place.arrival) - new Date(b.place.arrival)));
+    const a = cands[0].place;
+    const prev = byTrip.get(st.tripId);
+    if (prev && prev.dep <= depT) continue;           // dieselbe Fahrt nur einmal (früheste Abfahrt)
+    byTrip.set(st.tripId, {
+      dep: depT,
+      depSched: new Date(p.scheduledDeparture || p.departure),
+      arr: new Date(a.arrival),
+      arrSched: new Date(a.scheduledArrival || a.arrival),
+      line: (st.routeShortName || st.displayName || "").replace(/\s*\(.*\)\s*$/, ""),
+      color: st.routeColor, textColor: st.routeTextColor,
+      headsign: (st.headsign || st.tripTo?.name || "").split("//")[0].trim().replace(/\/$/, ""),
+      track: p.track || p.scheduledTrack || "",
+      trackChanged: !!(p.track && p.scheduledTrack && p.track !== p.scheduledTrack),
+      realtime: !!st.realTime,
+      cancelled: !!(st.cancelled || st.tripCancelled || p.cancelled),
+      mode: st.mode,
+      fromWest: isSecondary(p.stopId),
+      toWest: isSecondary(a.stopId),
+    });
+  }
+  return [...byTrip.values()].sort((x, y) => x.dep - y.dep);
+}
+
+function minutesUntil(d) { return Math.round((d - Date.now()) / 60000); }
+
+function depRow(d, isLater) {
+  const delay = Math.round((d.dep - d.depSched) / 60000);
+  const arrDelay = Math.round((d.arr - d.arrSched) / 60000);
+  const mins = minutesUntil(d.dep);
+  let delayHtml = "";
+  if (d.realtime && !d.cancelled) {
+    delayHtml = delay > 0 ? `<span class="delay late">+${delay}</span>` : `<span class="delay ontime">pünktlich</span>`;
+  } else if (!d.cancelled) {
+    delayHtml = `<span class="delay plan">laut Fahrplan</span>`;
+  }
+  const isRail = d.mode !== "TRAM" && d.mode !== "BUS";
+  const where = [];
+  if (d.mode === "BUS") where.push("Bus");
+  else if (d.mode === "TRAM") where.push("Tram");
+  if (d.track) where.push(`${isRail ? "Gleis" : "Steig"} <b>${esc(d.track)}</b>${d.trackChanged ? " (geändert)" : ""}`);
+  if (d.fromWest) where.push("ab <b>Hbf West</b>");
+  const arrTxt = `an ${fmtTime.format(d.arr)}${arrDelay > 0 && d.realtime ? ` (+${arrDelay})` : ""}${d.toWest ? " Hbf West" : ""}`;
+  where.push(arrTxt);
+  const badgeStyle = d.color ? `style="background:#${esc(d.color)};color:#${esc(d.textColor || "ffffff")}"` : "";
+  let inHtml;
+  if (d.cancelled) inHtml = "fällt aus";
+  else if (mins <= 0) inHtml = "jetzt";
+  else if (mins < 60) inHtml = `${mins} min<small>bis Abfahrt</small>`;
+  else inHtml = `${Math.floor(mins / 60)} h ${String(mins % 60).padStart(2, "0")}<small>bis Abfahrt</small>`;
+  return `<li class="dep${d.cancelled ? " cancelled" : ""}${isLater ? " later" : ""}">
+    <div class="time">${fmtTime.format(d.dep)}${delay > 0 && !d.cancelled ? `<span class="sched">${fmtTime.format(d.depSched)}</span>` : ""}${delayHtml}</div>
+    <span class="badge" ${badgeStyle}>${esc(d.line)}</span>
+    <div class="info"><div class="dir" title="${esc(d.headsign)}">${esc(d.headsign)}</div><div class="meta">${where.join(" · ")}</div></div>
+    <div class="in">${inHtml}</div>
+  </li>`;
+}
+
+function renderCard(r) {
+  const el = document.getElementById("card-" + r.key);
+  const s = state[r.key] || {};
+  const body = el.querySelector(".body");
+  const foot = el.querySelector(".card-foot");
+  if (s.loading && !s.deps) {
+    body.innerHTML = `<div class="loading" aria-label="Lädt"><div class="bar"></div><div class="bar"></div><div class="bar"></div></div>`;
+    foot.hidden = true;
+    return;
+  }
+  if (s.error && !s.deps) {
+    body.innerHTML = `<div class="error">Abfahrten konnten nicht geladen werden (${esc(s.error)}). Prüfe die Internetverbindung und tippe auf „Aktualisieren“.</div>`;
+    foot.hidden = true;
+    return;
+  }
+  const now = Date.now();
+  const all = (s.deps || []).filter(d => d.dep.getTime() >= now - 30000);
+  const shortEnd = now + r.short * 60000;
+  const longEnd = now + r.long * 60000;
+  const short = all.filter(d => d.dep.getTime() <= shortEnd);
+  const long = all.filter(d => d.dep.getTime() <= longEnd);
+  const list = s.expanded ? long : short;
+
+  if (!list.length) {
+    const next = all[0];
+    const span = spanLong(s.expanded ? r.long : r.short);
+    body.innerHTML = `<div class="empty">Keine Direktverbindung in den nächsten ${span}.${next ? ` Nächste Abfahrt um <b>${fmtTime.format(next.dep)}</b>.` : ""}</div>`;
+  } else {
+    body.innerHTML = `<ol class="deps">${list.map(d => depRow(d, s.expanded && d.dep.getTime() > shortEnd)).join("")}</ol>`;
+  }
+  foot.hidden = false;
+  const extra = long.length - short.length;
+  foot.querySelector(".count").textContent = s.expanded
+    ? `${long.length} Abfahrt${long.length === 1 ? "" : "en"} in ${spanShort(r.long)}`
+    : `${short.length} in ${spanShort(r.short)}${extra > 0 ? `, ${extra} weitere bis ${spanShort(r.long)}` : ""}`;
+  const btn = foot.querySelector("button");
+  btn.textContent = s.expanded ? "weniger" : "mehr";
+  btn.setAttribute("aria-expanded", s.expanded ? "true" : "false");
+}
+
+function buildCards() {
+  for (const r of ROUTES) {
+    state[r.key] = { expanded: false, loading: true };
+    const card = document.createElement("article");
+    card.className = "card";
+    card.id = "card-" + r.key;
+    card.innerHTML = `
+      <div class="card-head">
+        <h3 class="route"><span>${esc(r.from.name)}</span><span class="arrow" aria-label="nach">→</span><span>${esc(r.to.name)}</span></h3>
+        <div class="sub">${r.label}, ohne Umsteigen${r.from.note || r.to.note ? ` · Uni ${r.from.note || r.to.note}` : ""}</div>
+      </div>
+      <div class="body" aria-live="polite"></div>
+      <div class="card-foot" hidden>
+        <span class="count"></span>
+        <button class="btn primary" type="button" id="more-${r.key}" aria-controls="card-${r.key}">mehr</button>
+      </div>`;
+    card.querySelector("button").addEventListener("click", () => {
+      state[r.key].expanded = !state[r.key].expanded;
+      renderCard(r);
+    });
+    document.getElementById(r.pair).appendChild(card);
+    renderCard(r);
+  }
+}
+
+let loadingAll = false;
+async function refreshAll() {
+  if (loadingAll) return;
+  loadingAll = true;
+  const btn = document.getElementById("refresh");
+  btn.disabled = true; btn.textContent = "Lädt …";
+  await Promise.all(ROUTES.map(async (r, i) => {
+    const s = state[r.key];
+    await sleep(i * 250); // Anfragen leicht versetzt starten
+    s.loading = true; renderCard(r);
+    try { s.deps = await loadRoute(r); s.error = null; }
+    catch (e) { s.error = e.message || "Netzwerkfehler"; }
+    s.loading = false; renderCard(r);
+  }));
+  const anyErr = ROUTES.some(r => state[r.key].error);
+  document.getElementById("stand").textContent = `Stand ${fmtFull.format(new Date())}${anyErr ? " · teilweise ohne Daten" : ""}`;
+  btn.disabled = false; btn.textContent = "Aktualisieren";
+  loadingAll = false;
+}
+
+buildCards();
+refreshAll();
+document.getElementById("refresh").addEventListener("click", refreshAll);
+// Countdown jede 20 s neu zeichnen, Daten alle 2 min neu laden (nur bei sichtbarer Seite)
+setInterval(() => ROUTES.forEach(renderCard), 20000);
+let lastLoad = Date.now();
+setInterval(() => { if (!document.hidden) { lastLoad = Date.now(); refreshAll(); } }, REFRESH_MS);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && Date.now() - lastLoad > 60000) { lastLoad = Date.now(); refreshAll(); }
+});
+</script>
+</body>
+</html>
