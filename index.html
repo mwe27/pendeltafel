@@ -107,8 +107,15 @@ footer { color: var(--muted); font-size: .8rem; line-height: 1.5; max-width: 70c
 footer a { color: var(--focus); }
 footer a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
+/* Verbindungen mit Umstiegen: statt eines Linienschilds eine Kette der Linien */
+.dep.itin { grid-template-columns: 4.1rem 1fr auto; }
+.chain { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 5px; margin-bottom: 4px; }
+.chain .badge { min-width: 2.2rem; font-size: .82rem; padding: 3px 6px; }
+.chain .sep { color: var(--muted); font-size: .85rem; }
+
 @media (max-width: 420px) {
   .dep { grid-template-columns: 3.7rem 2.9rem 1fr auto; gap: 4px 8px; padding: 10px 12px; }
+  .dep.itin { grid-template-columns: 3.7rem 1fr auto; }
   .time { font-size: 1.2rem; }
 }
 </style>
@@ -130,13 +137,19 @@ footer a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
     <div class="pair" id="pair-tue"></div>
   </section>
 
+  <section class="city" aria-labelledby="h-tie">
+    <h2 id="h-tie">Tieringen · Bahn & Bus</h2>
+    <div class="pair" id="pair-tie"></div>
+  </section>
+
   <section class="city" aria-labelledby="h-mz">
     <h2 id="h-mz">Mainz · Straßenbahn & Bus</h2>
     <div class="pair" id="pair-mz"></div>
   </section>
 
   <footer>
-    Nur Direktverbindungen ohne Umsteigen: in Tübingen Bahn, in Mainz Straßenbahn und Bus. Zeiten mit Echtzeit, soweit die Verkehrsunternehmen sie liefern.
+    Tübingen und Mainz: nur Direktverbindungen ohne Umsteigen (Tübingen Bahn, Mainz Straßenbahn und Bus).
+    Tieringen: die nächsten Verbindungen mit Umstiegen, Bahn und Bus. Zeiten mit Echtzeit, soweit die Verkehrsunternehmen sie liefern.
     Daten: <a href="https://transitous.org" target="_blank" rel="noopener">Transitous</a> (MOTIS) mit Fahrplandaten von DELFI.
     Die Seite aktualisiert sich alle 2 Minuten, solange sie geöffnet ist.
   </footer>
@@ -144,6 +157,7 @@ footer a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 <script>
 const API = "https://api.transitous.org/api/v1/stoptimes";
+const PLAN_API = "https://api.transitous.org/api/v1/plan";   // Verbindungssuche (mit Umstiegen)
 const REFRESH_MS = 120000;
 
 // Haltestellen (DELFI-IDs). Die Abfrage liefert automatisch alle Steige der Station mit
@@ -155,6 +169,7 @@ const STOPS = {
   // Nur Steig A und B (die übrigen Steige der Haltestelle werden ausgefiltert)
   mzUni:  { id: "de-DELFI_de:07315:32202:4:A", name: "Universität (Oberstadt)", note: "nur Steig A/B",
             platforms: ["de-DELFI_de:07315:32202:4:A", "de-DELFI_de:07315:32202:4:B"] },
+  tieringen: { id: "de-DELFI_de:08417:37551:0:1", name: "Tieringen, Rathaus" },
 };
 const platformOk = (stop, stopId) => !stop.platforms || stop.platforms.includes(stopId);
 const HBF_WEST = "de-DELFI_de:07315:32236";
@@ -166,6 +181,9 @@ const ROUTES = [
   { key: "tk", pair: "pair-tue", from: STOPS.tueHbf, to: STOPS.kfurt,  modes: "RAIL", label: "Regionalbahn", short: 60, long: 180 },
   { key: "um", pair: "pair-mz",  from: STOPS.mzUni,  to: STOPS.mzHbf,  modes: "TRAM,BUS", label: "Straßenbahn und Bus", short: 15, long: 60 },
   { key: "mu", pair: "pair-mz",  from: STOPS.mzHbf,  to: STOPS.mzUni,  modes: "TRAM,BUS", label: "Straßenbahn und Bus", short: 15, long: 60 },
+  // kind "plan" = Verbindungen mit Umstiegen; count = sichtbare Verbindungen, long = Zeitfenster nach „mehr“
+  { key: "kti", pair: "pair-tie", from: STOPS.kfurt, to: STOPS.tieringen, kind: "plan", modes: "RAIL,TRAM,BUS", label: "Bahn und Bus", count: 3, long: 360 },
+  { key: "tik", pair: "pair-tie", from: STOPS.tieringen, to: STOPS.kfurt, kind: "plan", modes: "RAIL,TRAM,BUS", label: "Bahn und Bus", count: 3, long: 360 },
 ];
 
 const spanShort = m => m > 60 && m % 60 === 0 ? `${m / 60} Std.` : `${m} min`;
@@ -252,6 +270,52 @@ async function loadRoute(r) {
   return [...byTrip.values()].sort((x, y) => x.dep - y.dep);
 }
 
+function lineName(l) {
+  const n = (l.routeShortName || "").replace(/\s*\(.*\)\s*$/, "").trim();
+  if (!n) return { BUS: "Bus", TRAM: "Tram" }[l.mode] || "Zug";
+  // Bus mit Bahn-Liniennummer = Schienenersatzverkehr
+  if (l.mode === "BUS" && /^(RB|RE|MEX|IRE|IC|ICE|S)\s?\d/i.test(n)) return "SEV " + n;
+  return n;
+}
+
+// Verbindungen mit Umstiegen über die Verbindungssuche laden
+async function loadPlan(r) {
+  const q = new URLSearchParams({
+    fromPlace: r.from.id, toPlace: r.to.id,
+    time: new Date(Date.now() - 60000).toISOString(),
+    searchWindow: String(r.long * 60),
+    numItineraries: String(r.count),          // mindestens so viele, auch wenn das Fenster leer ist
+    transitModes: r.modes,
+  });
+  const data = await fetchWithRetry(`${PLAN_API}?${q}`);
+  const seen = new Set();
+  const out = [];
+  for (const it of data.itineraries || []) {
+    const legs = (it.legs || []).filter(l => l.mode !== "WALK" && l.tripId);
+    if (!legs.length) continue;
+    const key = legs.map(l => l.tripId).join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const first = legs[0], last = legs[legs.length - 1];
+    out.push({
+      kind: "itin",
+      dep: new Date(first.from.departure || first.startTime),
+      depSched: new Date(first.from.scheduledDeparture || first.scheduledStartTime || first.startTime),
+      arr: new Date(last.to.arrival || last.endTime),
+      arrSched: new Date(last.to.scheduledArrival || last.scheduledEndTime || last.endTime),
+      lines: legs.map(l => ({ line: lineName(l), color: l.routeColor, textColor: l.routeTextColor })),
+      via: legs.slice(1).map(l => l.from.name),
+      transfers: legs.length - 1,
+      track: first.from.track || first.from.scheduledTrack || "",
+      mode: first.mode,
+      realtime: !!first.realTime,
+      arrRealtime: !!last.realTime,
+      cancelled: legs.some(l => l.cancelled || l.from.cancelled || l.to.cancelled),
+    });
+  }
+  return out.sort((a, b) => a.dep - b.dep);
+}
+
 // Linienschild in der Farbe des Verkehrsverbunds (z. B. RB63 rot); ohne Angabe neutral
 function badgeStyle(d) {
   const hex = /^[0-9a-f]{6}$/i;
@@ -293,6 +357,39 @@ function depRow(d, isLater) {
   </li>`;
 }
 
+function delayHtmlFor(d) {
+  const delay = Math.round((d.dep - d.depSched) / 60000);
+  if (d.cancelled) return "";
+  if (!d.realtime) return `<span class="delay plan">laut Fahrplan</span>`;
+  return delay > 0 ? `<span class="delay late">+${delay}</span>` : `<span class="delay ontime">pünktlich</span>`;
+}
+
+function inHtmlFor(d) {
+  const mins = minutesUntil(d.dep);
+  if (d.cancelled) return "fällt aus";
+  if (mins <= 0) return "jetzt";
+  if (mins < 60) return `${mins} min<small>bis Abfahrt</small>`;
+  return `${Math.floor(mins / 60)} h ${String(mins % 60).padStart(2, "0")}<small>bis Abfahrt</small>`;
+}
+
+function itinRow(d) {
+  const delay = Math.round((d.dep - d.depSched) / 60000);
+  const arrDelay = Math.round((d.arr - d.arrSched) / 60000);
+  const dur = Math.round((d.arr - d.dep) / 60000);
+  const durTxt = dur >= 60 ? `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, "0")} Std.` : `${dur} min`;
+  const chain = d.lines.map(l => `<span class="badge"${badgeStyle(l)}>${esc(l.line)}</span>`).join(`<span class="sep" aria-hidden="true">›</span>`);
+  const meta = [];
+  meta.push(d.transfers === 0 ? "direkt" : `${d.transfers} Umstieg${d.transfers > 1 ? "e" : ""} (${d.via.map(esc).join(", ")})`);
+  if (d.track) meta.push(`${d.mode === "BUS" || d.mode === "TRAM" ? "Steig" : "Gleis"} <b>${esc(d.track)}</b>`);
+  meta.push(`an <b>${fmtTime.format(d.arr)}</b>${arrDelay > 0 && d.arrRealtime ? ` (+${arrDelay})` : ""}`);
+  meta.push(durTxt);
+  return `<li class="dep itin${d.cancelled ? " cancelled" : ""}">
+    <div class="time">${fmtTime.format(d.dep)}${delay > 0 && !d.cancelled ? `<span class="sched">${fmtTime.format(d.depSched)}</span>` : ""}${delayHtmlFor(d)}</div>
+    <div class="info"><div class="chain">${chain}</div><div class="meta">${meta.join(" · ")}</div></div>
+    <div class="in">${inHtmlFor(d)}</div>
+  </li>`;
+}
+
 function renderCard(r) {
   const el = document.getElementById("card-" + r.key);
   const s = state[r.key] || {};
@@ -310,6 +407,7 @@ function renderCard(r) {
   }
   const now = Date.now();
   const all = (s.deps || []).filter(d => d.dep.getTime() >= now - 30000);
+  if (r.kind === "plan") { renderPlanCard(r, s, all, now, body, foot); return; }
   const shortEnd = now + r.short * 60000;
   const longEnd = now + r.long * 60000;
   const short = all.filter(d => d.dep.getTime() <= shortEnd);
@@ -333,6 +431,26 @@ function renderCard(r) {
   btn.setAttribute("aria-expanded", s.expanded ? "true" : "false");
 }
 
+function renderPlanCard(r, s, all, now, body, foot) {
+  const short = all.slice(0, r.count);
+  let long = all.filter(d => d.dep.getTime() <= now + r.long * 60000);
+  const fallback = long.length < short.length;   // im Zeitfenster weniger als die nächsten N
+  if (fallback) long = short;
+  const list = s.expanded ? long : short;
+  body.innerHTML = list.length
+    ? `<ol class="deps">${list.map(itinRow).join("")}</ol>`
+    : `<div class="empty">Keine Verbindung gefunden.</div>`;
+  foot.hidden = false;
+  const extra = long.length - short.length;
+  const word = n => `Verbindung${n === 1 ? "" : "en"}`;
+  foot.querySelector(".count").textContent = s.expanded
+    ? (fallback ? `nächste ${short.length}, keine weiteren bis ${spanShort(r.long)}` : `${long.length} ${word(long.length)} bis ${spanShort(r.long)}`)
+    : `nächste ${short.length}${extra > 0 ? `, ${extra} weitere bis ${spanShort(r.long)}` : ""}`;
+  const btn = foot.querySelector("button");
+  btn.textContent = s.expanded ? "weniger" : "mehr";
+  btn.setAttribute("aria-expanded", s.expanded ? "true" : "false");
+}
+
 function buildCards() {
   for (const r of ROUTES) {
     state[r.key] = { expanded: false, loading: true };
@@ -342,7 +460,7 @@ function buildCards() {
     card.innerHTML = `
       <div class="card-head">
         <h3 class="route"><span>${esc(r.from.name)}</span><span class="arrow" aria-label="nach">→</span><span>${esc(r.to.name)}</span></h3>
-        <div class="sub">${r.label}, ohne Umsteigen${r.from.note || r.to.note ? ` · Uni ${r.from.note || r.to.note}` : ""}</div>
+        <div class="sub">${r.label}, ${r.kind === "plan" ? "mit" : "ohne"} Umsteigen${r.from.note || r.to.note ? ` · Uni ${r.from.note || r.to.note}` : ""}</div>
       </div>
       <div class="body" aria-live="polite"></div>
       <div class="card-foot" hidden>
@@ -368,7 +486,7 @@ async function refreshAll() {
     const s = state[r.key];
     await sleep(i * 250); // Anfragen leicht versetzt starten
     s.loading = true; renderCard(r);
-    try { s.deps = await loadRoute(r); s.error = null; }
+    try { s.deps = await (r.kind === "plan" ? loadPlan(r) : loadRoute(r)); s.error = null; }
     catch (e) { s.error = e.message || "Netzwerkfehler"; }
     s.loading = false; renderCard(r);
   }));
